@@ -34,7 +34,12 @@ console.log("orginal value", nextId)
 // GET /api/tasks — return all tasks
 // When React asks "give me all tasks", this runs
 app.get('/api/tasks', (req, res) => {
-  res.json(tasks); // Send the tasks array as JSON
+  if (req.query.completed === undefined) {
+    return res.json(tasks); // No filter requested — send everything
+  }
+
+  const isCompleted = req.query.completed === 'true'; // req.query values are always strings
+  res.json(tasks.filter(t => t.completed === isCompleted));
 });
 
 app.get('/api/tasks/:id', (req, res)=>{
