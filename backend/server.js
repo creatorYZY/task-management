@@ -36,6 +36,11 @@ console.log("orginal value", nextId)
 app.get('/api/tasks', (req, res) => {
   res.json(tasks); // Send the tasks array as JSON
 });
+
+app.get('/api/tasks/:id', (req, res)=>{
+    const id = parseInt(req.params.id);
+    res.json(tasks.find(t=> t.id ===id))
+})
 // POST /api/tasks — create a new task
 // When React says "create this task", this runs
 app.post('/api/tasks', (req, res) => {
