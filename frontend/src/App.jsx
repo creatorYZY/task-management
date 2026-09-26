@@ -115,7 +115,7 @@ function App() {
               }}>
                 {task.title}
                 <span style={{paddingLeft:'15px'}}>
-                {task.createdAt}
+                {new Date(task.createdAt).toLocaleString()}
 
                 </span>
               </span>
@@ -124,7 +124,7 @@ function App() {
                 onClick={() => handleDelete(task.id)}
                 style={{ background: '#ff4444', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
               >
-                Delete
+        Delete     {task.title}   
               </button>
             </li>
           ))}
@@ -134,6 +134,11 @@ function App() {
       <p style={{ color: '#666', fontSize: '14px' }}>
         {tasks.filter(t => t.completed).length} of {tasks.length} tasks completed
       </p>
+      <button
+      onClick={()=>handleDelete()}
+      >
+        Delete completed
+      </button>
     </div>
   );
 }
