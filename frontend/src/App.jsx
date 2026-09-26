@@ -60,6 +60,17 @@ function App() {
     }
   }
 
+  async function handleClearCompleted() {
+    const completedTasks = tasks.filter(t => t.completed);
+
+    try {
+      await Promise.all(completedTasks.map(t => deleteTask(t.id)));
+      setTasks(tasks.filter(t => !t.completed)); // Keep only the not-completed ones
+    } catch (err) {
+      setError('Failed to clear completed tasks');
+    }
+  }
+
   // RENDER — what the user actually sees
   if (loading) return <div>Loading tasks...</div>;
   if (error) return <div style={{ color: 'red' }}>{error}</div>;
@@ -135,7 +146,7 @@ function App() {
         {tasks.filter(t => t.completed).length} of {tasks.length} tasks completed
       </p>
       <button
-      onClick={()=>handleDelete()}
+      onClick={handleClearCompleted}
       >
         Delete completed
       </button>
