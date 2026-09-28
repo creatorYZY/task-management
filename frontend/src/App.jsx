@@ -111,7 +111,14 @@ function App() {
   const remainingCount = tasks.filter(t => !t.completed).length;
 
   // RENDER — what the user actually sees
-  if (loading) return <div>Loading tasks...</div>;
+  if (loading) {
+    return (
+      <div className="spinner-wrapper">
+        <div className="spinner"></div>
+        <p>Loading tasks...</p>
+      </div>
+    );
+  }
   if (error) return <div style={{ color: 'red' }}>{error}</div>;
 
   return (
