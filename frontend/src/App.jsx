@@ -131,7 +131,7 @@ function App() {
 
       {/* TASK LIST */}
       {tasks.length === 0 ? (
-        <p>No tasks yet. Add one above!</p>
+        <p>No tasks yet. Add one above!!</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {tasks.map(task => (
