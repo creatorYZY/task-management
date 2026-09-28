@@ -11,6 +11,7 @@ function App() {
   const [error, setError] = useState(null);      // Did something go wrong?
   const [editingId, setEditingId] = useState(null); // id of the task being edited (null = none)
   const [editText, setEditText] = useState('');     // What's typed in the edit box
+  const [actionError, setActionError] = useState(null); // Small message shown when an update fails and is rolled back
 
   // useEffect — runs code after the component renders
   // The empty [] means "run this only once, when the component first loads"
@@ -34,12 +35,33 @@ function App() {
   async function handleCreate() {
     if (!newTitle.trim()) return; // Don't create empty tasks
 
+    setActionError(null);
+    const oldTasks = tasks;   // Backup, in case we need to roll back
+    const typedTitle = newTitle;
+
+    // The server picks the real id, so for now we use a temporary one
+    const tempId = Date.now();
+    const tempTask = {
+      id: tempId,
+      title: typedTitle,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. Update the screen RIGHT AWAY
+    setTasks([...tasks, tempTask]);
+    setNewTitle('');
+
     try {
-      const response = await createTask(newTitle);
-      setTasks([...tasks, response.data]); // Add new task to the list
-      setNewTitle(''); // Clear the input
+      // 2. Call the server in the background
+      const response = await createTask(typedTitle);
+      // 3. Success: swap the temporary task for the real one from the server
+      setTasks(current => current.map(t => t.id === tempId ? response.data : t));
     } catch (err) {
-      setError('Failed to create task');
+      // 4. Failure: rollback — put everything back like it was
+      setTasks(oldTasks);
+      setNewTitle(typedTitle); // Give the typed text back to the user
+      setActionError('Failed to create task');
     }
   }
   async function handleUpdate(id, updatedData) {
@@ -52,12 +74,19 @@ function App() {
   }
 
   async function handleToggle(task) {
+    setActionError(null);
+    const oldTasks = tasks; // Backup, in case we need to roll back
+
+    // 1. Flip the checkbox on screen RIGHT AWAY
+    setTasks(tasks.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t));
+
     try {
-      const response = await updateTask(task.id, { completed: !task.completed });
-      // Replace the old task with the updated one
-      setTasks(tasks.map(t => t.id === task.id ? response.data : t));
+      // 2. Tell the server in the background
+      await updateTask(task.id, { completed: !task.completed });
     } catch (err) {
-      setError('Failed to update task');
+      // 3. Failed: rollback to the backup
+      setTasks(oldTasks);
+      setActionError('Failed to update task');
     }
   }
 
@@ -77,21 +106,37 @@ function App() {
       return;
     }
 
+    setActionError(null);
+    const oldTasks = tasks; // Backup, in case we need to roll back
+
+    // 1. Show the new title and leave edit mode RIGHT AWAY
+    setTasks(tasks.map(t => t.id === task.id ? { ...t, title: newText } : t));
+    setEditingId(null);
+
     try {
-      const response = await updateTask(task.id, { title: newText });
-      setTasks(tasks.map(t => t.id === task.id ? response.data : t));
-      setEditingId(null); // Back to show mode
+      // 2. Save on the server in the background
+      await updateTask(task.id, { title: newText });
     } catch (err) {
-      setError('Failed to edit task');
+      // 3. Failed: rollback — the old title comes back
+      setTasks(oldTasks);
+      setActionError('Failed to edit task');
     }
   }
 
   async function handleDelete(id) {
+    setActionError(null);
+    const oldTasks = tasks; // Backup, in case we need to roll back
+
+    // 1. Remove the task from the screen RIGHT AWAY
+    setTasks(tasks.filter(t => t.id !== id));
+
     try {
+      // 2. Delete on the server in the background
       await deleteTask(id);
-      setTasks(tasks.filter(t => t.id !== id)); // Remove from list
     } catch (err) {
-      setError('Failed to delete task');
+      // 3. Failed: rollback — the task comes back
+      setTasks(oldTasks);
+      setActionError('Failed to delete task');
     }
   }
 
@@ -154,6 +199,13 @@ function App() {
           Add Task
         </button>
       </div>
+
+      {/* Small message when an update failed and was rolled back */}
+      {actionError && (
+        <p style={{ color: '#b91c1c', background: '#fee2e2', padding: '8px 12px', borderRadius: '8px' }}>
+          {actionError} — your change was undone.
+        </p>
+      )}
 
       {/* TASK LIST */}
       {tasks.length === 0 ? (
