@@ -15,12 +15,30 @@ app.use(express.json());
 // Allow requests from our React frontend (which runs on a different port)
 app.use(cors());
 
+// ─────────────────────────────────────────────
+// RESPONSE HELPERS — every response now has the SAME shape
+// Success:  { success: true, data: ... }
+// Failure:  { success: false, error: { code, message } }
+// This means React never has to guess "did this work or not?" — it just checks .success
+// ─────────────────────────────────────────────
+
+function successResponse(res, data, statusCode = 200) {
+  return res.status(statusCode).json({ success: true, data });
+}
+
+function errorResponse(res, statusCode, code, message) {
+  return res.status(statusCode).json({
+    success: false,
+    error: { code, message },
+  });
+}
+
 // Temporary "database" — just an array in memory
 // When the server restarts, this resets. That's okay for now.
 let tasks = [
-  { id: 1, title: 'Learn React', completed: false ,createdAt: new Date().toISOString()},
-  { id: 2, title: 'Learn Node.js', completed: false , createdAt:new Date().toISOString() },
-  { id: 3, title: 'Learn Mongo', completed: false , createdAt:new Date().toISOString() },
+  { id: 1, title: 'Learn React', completed: false, priority: 'medium', createdAt: new Date().toISOString() },
+  { id: 2, title: 'Learn Node.js', completed: false, priority: 'high', createdAt: new Date().toISOString() },
+  { id: 3, title: 'Learn Mongo', completed: false, priority: 'low', createdAt: new Date().toISOString() },
 ];
 
 // A counter to give each new task a unique ID
@@ -49,43 +67,104 @@ function validateTitle(title) {
   return null; // null = no problem
 }
 
-// GET /api/tasks — return all tasks
-// When React asks "give me all tasks", this runs
+// GET /api/tasks — return tasks, with optional filtering, searching, sorting, and pagination
+// Examples:
+//   /api/tasks?completed=true
+//   /api/tasks?search=react
+//   /api/tasks?sortBy=title&order=asc
+//   /api/tasks?page=2&limit=10
 app.get('/api/tasks', (req, res) => {
-  if (req.query.completed === undefined) {
-    return res.json(tasks); // No filter requested — send everything
+  const { completed, search, sortBy, order, page, limit } = req.query;
+
+  let result = [...tasks]; // work on a COPY, so we never accidentally change the real list
+
+  // ── FILTER by completed ──
+  if (completed !== undefined) {
+    const isCompleted = completed === 'true'; // req.query values are always strings
+    result = result.filter(t => t.completed === isCompleted);
   }
 
-  const isCompleted = req.query.completed === 'true'; // req.query values are always strings
-  res.json(tasks.filter(t => t.completed === isCompleted));
+  // ── SEARCH by title (case-insensitive) ──
+  if (search) {
+    const searchLower = search.toLowerCase();
+    result = result.filter(t => t.title.toLowerCase().includes(searchLower));
+  }
+
+  // ── SORT ──
+  if (sortBy) {
+    result.sort((a, b) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+
+      if (valA < valB) return order === 'desc' ? 1 : -1;
+      if (valA > valB) return order === 'desc' ? -1 : 1;
+      return 0;
+    });
+  }
+
+  // ── PAGINATE ──
+  const total = result.length; // count BEFORE slicing, so React knows how many pages exist
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 10;
+  const startIndex = (pageNum - 1) * limitNum;
+  result = result.slice(startIndex, startIndex + limitNum);
+
+  return res.json({
+    success: true,
+    data: result,
+    pagination: {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    },
+  });
 });
 
-app.get('/api/tasks/:id', (req, res)=>{
-    const id = parseInt(req.params.id);
-    res.json(tasks.find(t=> t.id ===id))
-})
+// GET /api/tasks/:id — get a single task
+app.get('/api/tasks/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return errorResponse(res, 400, 'INVALID_ID', 'Task id must be a number');
+  }
+
+  const task = tasks.find(t => t.id === id);
+
+  if (!task) {
+    return errorResponse(res, 404, 'NOT_FOUND', `Task with id ${id} does not exist`);
+  }
+
+  return successResponse(res, task);
+});
 // POST /api/tasks — create a new task
 // When React says "create this task", this runs
 app.post('/api/tasks', (req, res) => {
-  const { title } = req.body; // Extract 'title' from the request body
+  const { title, priority } = req.body; // Extract fields from the request body
 
   // Check the title BEFORE creating anything
   const titleError = validateTitle(title);
   if (titleError) {
-    return res.status(400).json({ error: titleError }); // 400 = Bad Request
+    return errorResponse(res, 400, 'VALIDATION_ERROR', titleError);
+  }
+
+  const validPriorities = ['low', 'medium', 'high'];
+  if (priority && !validPriorities.includes(priority)) {
+    return errorResponse(res, 400, 'VALIDATION_ERROR', `Priority must be one of: ${validPriorities.join(', ')}`);
   }
 
   const newTask = {
     id: nextId++,
     title: title.trim(), // save without the extra spaces
     completed: false,
+    priority: priority || 'medium', // default priority if none was sent
     createdAt: new Date().toISOString(),
   };
 
   tasks.push(newTask); // Add to our "database"
-  res.status(201).json(newTask); // 201 = "Created successfully"
-  console.log(nextId);
-  console.log(newTask.createdAt);
+  return successResponse(res, newTask, 201); // 201 = "Created successfully"
 });
 
 // PATCH /api/tasks/:id — update a task (toggle completed)
@@ -93,25 +172,36 @@ app.post('/api/tasks', (req, res) => {
 // e.g. PATCH /api/tasks/3 → req.params.id = "3"
 app.patch('/api/tasks/:id', (req, res) => {
   const id = parseInt(req.params.id); // Convert string "3" to number 3
+
+  if (isNaN(id)) {
+    return errorResponse(res, 400, 'INVALID_ID', 'Task id must be a number');
+  }
+
   const task = tasks.find(t => t.id === id); // Find the task
 
   if (!task) {
-    return res.status(404).json({ error: 'Task not found' }); // 404 = Not Found
+    return errorResponse(res, 404, 'NOT_FOUND', `Task with id ${id} does not exist`);
   }
 
   // If a title was sent, check it BEFORE changing anything
   if (req.body.title !== undefined) {
     const titleError = validateTitle(req.body.title);
     if (titleError) {
-      return res.status(400).json({ error: titleError });
+      return errorResponse(res, 400, 'VALIDATION_ERROR', titleError);
     }
+  }
+
+  const validPriorities = ['low', 'medium', 'high'];
+  if (req.body.priority !== undefined && !validPriorities.includes(req.body.priority)) {
+    return errorResponse(res, 400, 'VALIDATION_ERROR', `Priority must be one of: ${validPriorities.join(', ')}`);
   }
 
   // Update only the fields that were sent in the request body
   if (req.body.title !== undefined) task.title = req.body.title.trim();
   if (req.body.completed !== undefined) task.completed = req.body.completed;
+  if (req.body.priority !== undefined) task.priority = req.body.priority;
 
-  res.json(task); // Send back the updated task
+  return successResponse(res, task);
 });
 
 // PATCH /api/tasks/:id/move — move a task up or down in the list
@@ -147,17 +237,27 @@ app.patch('/api/tasks/:id/move', (req, res) => {
 // DELETE /api/tasks/:id — delete a task
 app.delete('/api/tasks/:id', (req, res) => {
   const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return errorResponse(res, 400, 'INVALID_ID', 'Task id must be a number');
+  }
+
   const index = tasks.findIndex(t => t.id === id);
 
   if (index === -1) {
-    return res.status(404).json({ error: 'Task not found' });
+    return errorResponse(res, 404, 'NOT_FOUND', `Task with id ${id} does not exist`);
   }
 
   tasks.splice(index, 1); // Remove 1 item at this index
-  console.log(nextId);
 
-  res.status(204).send(); // 204 = "Success, nothing to send back"
+  return res.status(204).send(); // 204 = "Success, nothing to send back"
+});
 
+// ─────────────────────────────────────────────
+// CATCH-ALL — runs only if no route above matched
+// ─────────────────────────────────────────────
+app.use((req, res) => {
+  return errorResponse(res, 404, 'ROUTE_NOT_FOUND', `Route ${req.method} ${req.path} does not exist`);
 });
 
 // Start the server — listen for requests on port 5000
