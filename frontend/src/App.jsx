@@ -129,7 +129,7 @@ function App() {
         </button>
       </div>
 
-      {/* TASK LIST */}
+      {/* TASK LIST *--/}
       {tasks.length === 0 ? (
         <p>No tasks yet. Add one above!!</p>
       ) : (
