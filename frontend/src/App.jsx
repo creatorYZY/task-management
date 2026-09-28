@@ -147,7 +147,7 @@ function App() {
                 borderRadius: '8px',
               }}
             >
-              {/* Toggle completed */}
+              {/* -Toggle completed */}
               <input
                 type="checkbox"
                 checked={task.completed}
