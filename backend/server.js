@@ -31,6 +31,24 @@ console.log("orginal value", nextId)
 // Each route listens for a specific HTTP method + URL
 // ─────────────────────────────────────────────
 
+// VALIDATION — one place that checks a title, used by both POST and PATCH
+const MAX_TITLE_LENGTH = 100;
+
+// Returns an error message (text) if the title is bad, or null if it is fine
+function validateTitle(title) {
+  if (typeof title !== 'string') {
+    return 'Title is required'; // missing, or not text (like a number)
+  }
+  const trimmed = title.trim(); // remove spaces at the start and end
+  if (trimmed.length === 0) {
+    return 'Title cannot be empty';
+  }
+  if (trimmed.length > MAX_TITLE_LENGTH) {
+    return `Title must be ${MAX_TITLE_LENGTH} characters or less`;
+  }
+  return null; // null = no problem
+}
+
 // GET /api/tasks — return all tasks
 // When React asks "give me all tasks", this runs
 app.get('/api/tasks', (req, res) => {
@@ -51,9 +69,15 @@ app.get('/api/tasks/:id', (req, res)=>{
 app.post('/api/tasks', (req, res) => {
   const { title } = req.body; // Extract 'title' from the request body
 
+  // Check the title BEFORE creating anything
+  const titleError = validateTitle(title);
+  if (titleError) {
+    return res.status(400).json({ error: titleError }); // 400 = Bad Request
+  }
+
   const newTask = {
     id: nextId++,
-    title: title,
+    title: title.trim(), // save without the extra spaces
     completed: false,
     createdAt: new Date().toISOString(),
   };
@@ -75,8 +99,16 @@ app.patch('/api/tasks/:id', (req, res) => {
     return res.status(404).json({ error: 'Task not found' }); // 404 = Not Found
   }
 
+  // If a title was sent, check it BEFORE changing anything
+  if (req.body.title !== undefined) {
+    const titleError = validateTitle(req.body.title);
+    if (titleError) {
+      return res.status(400).json({ error: titleError });
+    }
+  }
+
   // Update only the fields that were sent in the request body
-  if (req.body.title !== undefined) task.title = req.body.title;
+  if (req.body.title !== undefined) task.title = req.body.title.trim();
   if (req.body.completed !== undefined) task.completed = req.body.completed;
 
   res.json(task); // Send back the updated task

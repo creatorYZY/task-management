@@ -61,7 +61,9 @@ function App() {
       // 4. Failure: rollback — put everything back like it was
       setTasks(oldTasks);
       setNewTitle(typedTitle); // Give the typed text back to the user
-      setActionError('Failed to create task');
+      // Show the server's message if it sent one (e.g. "Title must be 100 characters or less")
+      // err.response is undefined when the server is off, so we use ?. and a fallback
+      setActionError(err.response?.data?.error || 'Failed to create task');
     }
   }
   async function handleUpdate(id, updatedData) {
@@ -119,7 +121,7 @@ function App() {
     } catch (err) {
       // 3. Failed: rollback — the old title comes back
       setTasks(oldTasks);
-      setActionError('Failed to edit task');
+      setActionError(err.response?.data?.error || 'Failed to edit task');
     }
   }
 
