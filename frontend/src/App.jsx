@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getTasks, createTask, updateTask, deleteTask } from './api';
 
 function App() {
-  // STATE — React's memory
+  // STATE — React's memory--
   // When state changes, React re-renders the component automatically
   // useState(initialValue) returns [currentValue, functionToUpdateIt]
   const [tasks, setTasks] = useState([]);        // Our list of tasks
