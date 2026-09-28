@@ -106,6 +106,10 @@ function App() {
     }
   }
 
+  // Tasks that are NOT completed yet
+  // No useState needed — it's worked out from `tasks` every time we render
+  const remainingCount = tasks.filter(t => !t.completed).length;
+
   // RENDER — what the user actually sees
   if (loading) return <div>Loading tasks...</div>;
   if (error) return <div style={{ color: 'red' }}>{error}</div>;
@@ -113,6 +117,21 @@ function App() {
   return (
     <div style={{ maxWidth: '600px', margin: '40px auto', fontFamily: 'sans-serif' }}>
       <h1>TaskFlow</h1>
+
+      {/* REMAINING BADGE */}
+      <span style={{
+        display: 'inline-block',
+        marginBottom: '16px',
+        padding: '4px 12px',
+        borderRadius: '999px',
+        background: remainingCount === 0 ? '#2e9e4f' : '#3b82f6',
+        color: 'white',
+        fontSize: '14px',
+      }}>
+        {remainingCount === 0
+          ? 'All done!'
+          : `${remainingCount} ${remainingCount === 1 ? 'task' : 'tasks'} remaining`}
+      </span>
 
       {/* CREATE TASK */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
