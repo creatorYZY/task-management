@@ -11,3 +11,5 @@ export const  createTask = (title) => API.post('/tasks', {title, completed: fals
 export const updateTask = (id, data) => API.patch(`/tasks/${id}`, data);
 
 export const deleteTask = (id) => API.delete(`/tasks/${id}`);
+
+export const moveTask = (id, direction) => API.patch(`/tasks/${id}/move`, { direction });

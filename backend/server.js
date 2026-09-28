@@ -82,6 +82,36 @@ app.patch('/api/tasks/:id', (req, res) => {
   res.json(task); // Send back the updated task
 });
 
+// PATCH /api/tasks/:id/move — move a task up or down in the list
+// Body: { direction: 'up' } or { direction: 'down' }
+// The order of the array IS the order of the tasks, so moving = swapping two items
+app.patch('/api/tasks/:id/move', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { direction } = req.body;
+  const index = tasks.findIndex(t => t.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Task not found' });
+  }
+
+  if (direction !== 'up' && direction !== 'down') {
+    return res.status(400).json({ error: "direction must be 'up' or 'down'" }); // 400 = Bad Request
+  }
+
+  // Where is the task we want to swap with?
+  const otherIndex = direction === 'up' ? index - 1 : index + 1;
+
+  // Already first (can't go up) or last (can't go down)?
+  if (otherIndex < 0 || otherIndex >= tasks.length) {
+    return res.status(400).json({ error: `Task is already at the ${direction === 'up' ? 'top' : 'bottom'}` });
+  }
+
+  // Swap the two tasks
+  [tasks[index], tasks[otherIndex]] = [tasks[otherIndex], tasks[index]];
+
+  res.json(tasks); // Send back the whole updated list
+});
+
 // DELETE /api/tasks/:id — delete a task
 app.delete('/api/tasks/:id', (req, res) => {
   const id = parseInt(req.params.id);

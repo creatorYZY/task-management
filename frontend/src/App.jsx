@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getTasks, createTask, updateTask, deleteTask } from './api';
+import { getTasks, createTask, updateTask, deleteTask, moveTask } from './api';
 
 function App() {
   // STATE — React's memory
@@ -123,6 +123,30 @@ function App() {
     }
   }
 
+  // Move a task up or down (swap it with its neighbour)
+  async function handleMove(index, direction) {
+    const otherIndex = direction === 'up' ? index - 1 : index + 1;
+    if (otherIndex < 0 || otherIndex >= tasks.length) return; // Already at the edge
+
+    setActionError(null);
+    const oldTasks = tasks; // Backup, in case we need to roll back
+    const taskId = tasks[index].id;
+
+    // 1. Swap on screen RIGHT AWAY — swap inside a COPY, never inside `tasks` itself
+    const newTasks = [...tasks];
+    [newTasks[index], newTasks[otherIndex]] = [newTasks[otherIndex], newTasks[index]];
+    setTasks(newTasks);
+
+    try {
+      // 2. Tell the server in the background
+      await moveTask(taskId, direction);
+    } catch (err) {
+      // 3. Failed: rollback
+      setTasks(oldTasks);
+      setActionError('Failed to move task');
+    }
+  }
+
   async function handleDelete(id) {
     setActionError(null);
     const oldTasks = tasks; // Backup, in case we need to roll back
@@ -212,7 +236,7 @@ function App() {
         <p>No tasks yet. Add one above!!</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {tasks.map(task => (
+          {tasks.map((task, index) => (
             <li
               key={task.id}
               style={{
@@ -266,6 +290,21 @@ function App() {
 
                 </span>
               </span>
+              {/* Move up / down buttons — disabled at the top and bottom of the list */}
+              <button
+                onClick={() => handleMove(index, 'up')}
+                disabled={index === 0}
+                title="Move up"
+              >
+                ▲
+              </button>
+              <button
+                onClick={() => handleMove(index, 'down')}
+                disabled={index === tasks.length - 1}
+                title="Move down"
+              >
+                ▼
+              </button>
               {/* Delete button */}
               <button
                 onClick={() => handleDelete(task.id)}
