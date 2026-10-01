@@ -6,18 +6,16 @@ app.use(express.json());
 app.use(cors());
 
 // ─────────────────────────────────────────────
-// RESPONSE HELPERS — consistent shape every time
+// RESPONSE HELPERS — every response now has the SAME shape
+// Success:  { success: true, data: ... }
+// Failure:  { success: false, error: { code, message } }
+// This means React never has to guess "did this work or not?" — it just checks .success
 // ─────────────────────────────────────────────
 
-// Call this when everything worked
 function successResponse(res, data, statusCode = 200) {
-  return res.status(statusCode).json({
-    success: true,
-    data: data,
-  });
+  return res.status(statusCode).json({ success: true, data });
 }
 
-// Call this when something went wrong
 function errorResponse(res, statusCode, code, message) {
   return res.status(statusCode).json({
     success: false,
@@ -33,9 +31,9 @@ function errorResponse(res, statusCode, code, message) {
 // ─────────────────────────────────────────────
 let tasks = [
   { id: 1, title: 'Learn React', completed: false, priority: 'medium', createdAt: new Date().toISOString() },
-  { id: 2, title: 'Learn Node.js', completed: true,  priority: 'high',   createdAt: new Date().toISOString() },
+  { id: 2, title: 'Learn Node.js', completed: true, priority: 'high', createdAt: new Date().toISOString() },
   { id: 3, title: 'Learn PostgreSQL', completed: false, priority: 'high', createdAt: new Date().toISOString() },
-  { id: 4, title: 'Build TaskFlow', completed: false, priority: 'low',  createdAt: new Date().toISOString() },
+  { id: 4, title: 'Build TaskFlow', completed: false, priority: 'low', createdAt: new Date().toISOString() },
 ];
 let nextId = 5;
 
@@ -45,7 +43,7 @@ let nextId = 5;
 
 // GET /api/tasks
 // Supports: ?status=completed|pending  ?priority=high|medium|low  ?search=text
-// Supports: ?sortBy=createdAt|title|priority  ?order=asc|desc
+// Supports: ?sortBy=createdAt|title|priority  ?order=asc|desc  (sortBy omitted = natural/manual order)
 // Supports: ?page=1  ?limit=10
 app.get('/api/tasks', (req, res) => {
   // req.query contains all query parameters as an object
@@ -73,7 +71,7 @@ app.get('/api/tasks', (req, res) => {
     result = result.filter(t => t.title.toLowerCase().includes(searchLower));
   }
 
-  // ── SORTING ──
+  // ── SORTING ── (no sortBy = keep the tasks in their stored/manual order)
   if (sortBy) {
     result.sort((a, b) => {
       let valA = a[sortBy];
@@ -208,7 +206,9 @@ app.patch('/api/tasks/:id', (req, res) => {
 
 // PATCH /api/tasks/:id/move — move a task up or down in the list
 // Body: { direction: 'up' } or { direction: 'down' }
-// The order of the array IS the order of the tasks, so moving = swapping two items
+// The order of the array IS the order of the tasks, so moving = swapping two items.
+// This only matches what the user sees on screen when the list isn't sorted/filtered —
+// see the `canReorder` check on the frontend.
 app.patch('/api/tasks/:id/move', (req, res) => {
   const id = parseInt(req.params.id);
 
@@ -260,8 +260,8 @@ app.delete('/api/tasks/:id', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// CATCH-ALL — for routes that don't exist
-// This must stay AFTER all the routes above
+// CATCH-ALL — runs only if no route above matched.
+// This must stay AFTER all the routes above.
 // ─────────────────────────────────────────────
 app.use((req, res) => {
   return errorResponse(res, 404, 'ROUTE_NOT_FOUND', `Route ${req.method} ${req.path} does not exist`);
