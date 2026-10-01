@@ -4,7 +4,10 @@ const API = axios.create({
     baseURL: 'http://localhost:5000/api',
 })
 
-export const getTasks = () => API.get('/tasks');
+// The backend now sends 10 tasks per page by default.
+// Our screen shows the whole list, so we ask for up to 1000 at once.
+// You can pass filters too, e.g. getTasks({ status: 'pending', search: 'react' })
+export const getTasks = (params) => API.get('/tasks', { params: { limit: 1000, ...params } });
 
 export const  createTask = (title) => API.post('/tasks', {title, completed: false});
 

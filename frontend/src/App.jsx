@@ -24,7 +24,9 @@ function App() {
     try {
       setLoading(true);
       const response = await getTasks();
-      setTasks(response.data); // response.data contains the JSON from our backend
+      // Backend replies { success, data, pagination }
+      // axios puts that whole reply in response.data, so our tasks are in response.data.data
+      setTasks(response.data.data);
     } catch (err) {
       setError('Failed to load tasks');
     } finally {
@@ -56,20 +58,21 @@ function App() {
       // 2. Call the server in the background
       const response = await createTask(typedTitle);
       // 3. Success: swap the temporary task for the real one from the server
-      setTasks(current => current.map(t => t.id === tempId ? response.data : t));
+      setTasks(current => current.map(t => t.id === tempId ? response.data.data : t));
     } catch (err) {
       // 4. Failure: rollback — put everything back like it was
       setTasks(oldTasks);
       setNewTitle(typedTitle); // Give the typed text back to the user
       // Show the server's message if it sent one (e.g. "Title must be 100 characters or less")
       // err.response is undefined when the server is off, so we use ?. and a fallback
-      setActionError(err.response?.data?.error || 'Failed to create task');
+      // The backend's error now looks like { error: { code, message } }
+      setActionError(err.response?.data?.error?.message || 'Failed to create task');
     }
   }
   async function handleUpdate(id, updatedData) {
     try {
       const response = await updateTask(id, updatedData);
-      setTasks(tasks.map(t => t.id === id ? response.data : t));
+      setTasks(tasks.map(t => t.id === id ? response.data.data : t));
     } catch (err){
       setError('Failed to update task');
     }
@@ -121,7 +124,7 @@ function App() {
     } catch (err) {
       // 3. Failed: rollback — the old title comes back
       setTasks(oldTasks);
-      setActionError(err.response?.data?.error || 'Failed to edit task');
+      setActionError(err.response?.data?.error?.message || 'Failed to edit task');
     }
   }
 
